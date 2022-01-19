@@ -1,5 +1,6 @@
 import numpy as np
 import pygame
+import pygame.time
 import socket
 import sys
 import math
@@ -19,6 +20,8 @@ YELLOW = (255,255,0)
  
 ROW_COUNT = 28
 COLUMN_COUNT = 30
+
+clock = pygame.time.Clock()
 
 port = 65506
 PACKET_SIZE = 1357;
@@ -141,12 +144,12 @@ myfont = pygame.font.SysFont("monospace", 75)
 while not game_over:
     # read UDP packets
     #print("####### Server is listening #######")
-    print ('.')
+    #print ('.')
     #data, address = s.recvfrom(4096)
     #if data:
     #    print (data)
 
-    
+    clock.tick(60)
  
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
