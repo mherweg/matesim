@@ -11,7 +11,6 @@ import math
 #
 # TODO: Daten per UDP (tpm2.net) oder seriell (TPM2) empfangen
 #
-
  
 BLUE = (0,0,255)
 BLACK = (0,0,0)
@@ -28,10 +27,48 @@ PACKET_SIZE = 1357;
 packetBuffer = np.zeros(PACKET_SIZE)
 
 # das klappt noch nicht: 
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # Bind the socket to the port
 #server_address = ('127.0.0.1', port)
 #s.bind(server_address)
+
+def readTPM2file():
+    global rgbArray
+    file1 = open("../content/rubik.tpm2", "rb")
+ 
+    print("readTPM2file")
+    packetBuffer = file1.read()
+    file1.close()
+    if ( packetBuffer[0] == 0xC9):  # header identifier
+        print ('packet start')
+        blocktype = packetBuffer[1] # block type (0xDA)
+        framelength = (packetBuffer[2] << 8) | packetBuffer[3]
+        if (blocktype == 0xDA):
+            print ('blocktype=DA')
+            row=0
+            col=0
+            packetindex = 6
+            while(packetindex < (framelength + 6)): 
+                    r =packetBuffer[packetindex]
+                    g =packetBuffer[packetindex+1]
+                    b =packetBuffer[packetindex+2]
+                    # print (row,col, r,g,b)
+                    rgbArray[row][col][0] = r
+                    rgbArray[row][col][1] = g
+                    rgbArray[row][col][2] = b
+                  
+                    col+=1
+                    packetindex +=3
+                    if (col == COLUMN_COUNT):
+                        col = 0
+                        row +=1
+            #pixels.show()
+            #led_index = 0
+            
+ 
+    return(rgbArray)
+    
+
 
 # work in progress:
 def tpm2NetHandle(packetBuffer, PACKET_SIZE):
@@ -52,19 +89,24 @@ def tpm2NetHandle(packetBuffer, PACKET_SIZE):
                 i = 0
                 packetindex = 6
                 
-                if(packagenum == 1):
-                    led_index = 0
+                col=0
+                row = 0
           
                 while(packetindex < (framelength + 6)): 
                     r =packetBuffer[packetindex]
                     g =packetBuffer[packetindex+1]
                     b =packetBuffer[packetindex+2]
-                    pixels[led_index][0] = r
-                    pixels[led_index][1] = g
-                    pixels[led_index][2] = b
+                    rgbArray[row][col][0] = r
+                    rgbArray[row][col][1] = r
+                    rgbArray[row][col][2] = r
+                 
                     
-                    led_index +=1        
+                    col +=1
                     packetindex +=3
+                    if (col == COLUMN_COUNT):
+                        col = 0
+                        row +=1
+                    
           
         if((packagenum == numpackages) and (led_index== NUMPIXELS)): 
             pixels.show()
@@ -92,8 +134,8 @@ def get_next_open_row(board, col):
         if board[r][col] == 0:
             return r
  
-def print_board(board):
-    print(np.flip(board, 0))
+def print_board(rgbArray):
+    print(np.flip(rgbArray, 0))
  
 def winning_move(board, piece):
     return False
@@ -116,13 +158,13 @@ def draw_board(board):
  
  
 board,rgbArray = create_board()
-print_board(board)
+print_board(rgbArray)
 game_over = False
 turn = 0
- 
+
 #initalize pygame
 pygame.init()
- 
+
 #define our screen size
 SQUARESIZE = 30
  
@@ -136,10 +178,18 @@ RADIUS = int(SQUARESIZE/2 - 5)
  
 screen = pygame.display.set_mode(size)
 #Calling function draw_board again
+
+rgbArray = readTPM2file()
+print ('rgbArray:')
+print (rgbArray)
 draw_board(board)
 pygame.display.update()
  
 myfont = pygame.font.SysFont("monospace", 75)
+
+
+rgbArray = readTPM2file()
+
  
 while not game_over:
     # read UDP packets
