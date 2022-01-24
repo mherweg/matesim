@@ -39,31 +39,30 @@ def readTPM2file():
     print("readTPM2file")
     packetBuffer = file1.read()
     file1.close()
-    if ( packetBuffer[0] == 0xC9):  # header identifier
+    i = 0
+    frame = 0
+    
+    if ( packetBuffer[i] == 0xC9):  # header identifier
         print ('packet start')
-        blocktype = packetBuffer[1] # block type (0xDA)
-        framelength = (packetBuffer[2] << 8) | packetBuffer[3]
+        blocktype = packetBuffer[i+1] # block type (0xDA)
+        framelength = (packetBuffer[i+2] << 8) | packetBuffer[i+3]
         if (blocktype == 0xDA):
             print ('blocktype=DA')
-            row=0
+            row=ROW_COUNT-1
             col=0
-            packetindex = 6
-            while(packetindex < (framelength + 6)): 
-                    r =packetBuffer[packetindex]
-                    g =packetBuffer[packetindex+1]
-                    b =packetBuffer[packetindex+2]
+            packetindex = i+4
+            while(packetindex < (framelength + 4)): 
                     # print (row,col, r,g,b)
-                    rgbArray[row][col][0] = r
-                    rgbArray[row][col][1] = g
-                    rgbArray[row][col][2] = b
+                    rgbArray[row][col][0] = packetBuffer[packetindex]
+                    rgbArray[row][col][1] = packetBuffer[packetindex+1]
+                    rgbArray[row][col][2] = packetBuffer[packetindex+2]
                   
                     col+=1
                     packetindex +=3
                     if (col == COLUMN_COUNT):
                         col = 0
-                        row +=1
-            #pixels.show()
-            #led_index = 0
+                        row -=1
+            print('endbyte(soll:54):',packetBuffer[packetindex] )
             
  
     return(rgbArray)
@@ -141,11 +140,7 @@ def winning_move(board, piece):
     return False
  
 def draw_board(board):
-    #for c in range(COLUMN_COUNT):
-        #for r in range(ROW_COUNT):
-        #    pygame.draw.rect(screen, BLUE, (c*SQUARESIZE, r*SQUARESIZE+SQUARESIZE, SQUARESIZE, SQUARESIZE))
-          #  pygame.draw.circle(screen, BLACK, (int(c*SQUARESIZE+SQUARESIZE/2), int(r*SQUARESIZE+SQUARESIZE+SQUARESIZE/2)), RADIUS)
-     
+   
     for c in range(COLUMN_COUNT):
         for row in range(ROW_COUNT):
             r = rgbArray[row][c][0]
