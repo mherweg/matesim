@@ -1,16 +1,17 @@
 # matesim
 Simulator of our c3RE Mate Display made with pygame
 
-# needs:
+## needs:
 python3
 pygame
 
-# issues:
-
+## issues:
 transmitter (glediator, jinx, ...)
 and matesim must run on 2 different computers
 
-# ToDo
+## ToDo
 TPM2 serial output
 
+# tpm2-file-player
+plays TPM2 Files that were created with Jinx! or similar tools
 
