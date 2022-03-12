@@ -8,247 +8,153 @@ import math
 # erledigt: 
 # * Spielfeld auf 30x28 vergrößert
 # * Pixel kann jede Farbe annehemen
+# * Daten per UDP (tpm2.net)
 #
-# TODO: Daten per UDP (tpm2.net) oder seriell (TPM2) empfangen
+# TODO:
+# seriell (TPM2) senden
 #
+
+# max channels in glediator regelt die framelength statisch! Egal wie viele Channel tatsächlich genutzt werden.
+# 8x8 Feld - bei max channels 512 trotzdem framelength = 512
+
+LOCAL_IP = '192.168.8.3' # configured in tpm2_net player software (jinx, glediator)
  
-BLUE = (0,0,255)
-BLACK = (0,0,0)
-RED = (255,0,0)
-YELLOW = (255,255,0)
+ROW_COUNT = 28 #8 #28
+COLUMN_COUNT = 30 #8 #30
+NUMPIXELS = ROW_COUNT * COLUMN_COUNT
+TPM2_NET_HEADERSIZE = 6 #Bytes
+
+game_over = 0
+
+#define our screen size
+SQUARESIZE = 30
+#define width and height of board
+width = COLUMN_COUNT * SQUARESIZE
+height = (ROW_COUNT) * SQUARESIZE
+size = (width, height)
  
-ROW_COUNT = 28
-COLUMN_COUNT = 30
+RADIUS = int(SQUARESIZE/2 - 5)
 
 clock = pygame.time.Clock()
 
 port = 65506
-PACKET_SIZE = 1357;
+PACKET_SIZE = 1357
 packetBuffer = np.zeros(PACKET_SIZE)
+pixels = np.zeros((NUMPIXELS, 3), 'uint8')
 
-# das klappt noch nicht: 
-#s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-# Bind the socket to the port
-#server_address = ('127.0.0.1', port)
-#s.bind(server_address)
-
-def readTPM2file():
-    global rgbArray
-    file1 = open("../content/rubik.tpm2", "rb")
- 
-    print("readTPM2file")
-    packetBuffer = file1.read()
-    file1.close()
-    i = 0
-    frame = 0
+# bind to local UDP socket
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+server_address = (LOCAL_IP, port)
+s.bind(server_address)
     
-    if ( packetBuffer[i] == 0xC9):  # header identifier
-        print ('packet start')
-        blocktype = packetBuffer[i+1] # block type (0xDA)
-        framelength = (packetBuffer[i+2] << 8) | packetBuffer[i+3]
-        if (blocktype == 0xDA):
-            print ('blocktype=DA')
-            row=ROW_COUNT-1
-            col=0
-            packetindex = i+4
-            while(packetindex < (framelength + 4)): 
-                    # print (row,col, r,g,b)
-                    rgbArray[row][col][0] = packetBuffer[packetindex]
-                    rgbArray[row][col][1] = packetBuffer[packetindex+1]
-                    rgbArray[row][col][2] = packetBuffer[packetindex+2]
-                  
-                    col+=1
-                    packetindex +=3
-                    if (col == COLUMN_COUNT):
-                        col = 0
-                        row -=1
-            print('endbyte(soll:54):',packetBuffer[packetindex] )
-            
- 
-    return(rgbArray)
     
-
 
 # work in progress:
+led_index = 0
 def tpm2NetHandle(packetBuffer, PACKET_SIZE):
+    global led_index
+    global pixels
 
-    print("r")
+    #print("r")
     #We've received a packet, read the data from it
-   
+
     if ( packetBuffer[0] == 0x9C):  # header identifier (packet start)
         blocktype = packetBuffer[1] # block type (0xDA)
         framelength = (packetBuffer[2] << 8) | packetBuffer[3] # frame length (0x0069) = 105 leds
         packagenum = packetBuffer[4]   # packet number 0-255 0x00 = no frame split (0x01)
         numpackages = packetBuffer[5]   # total packets 1-255 (0x01)
+
+        #print("blocktype     : ", hex(blocktype))
+        #print("framelength   : ", framelength)
+        #print("packetnumber  : ", packagenum)
+        #print("total packets : ", numpackages)
                    
-        if (blocktype == 0xDA): 
-        
-            if ((cb >= framelength + 7) and (packetBuffer[6 + framelength] == 0x36)): 
-          #header end (packet stop)
+        if (blocktype == 0xDA):
+
+            #print("frame #", packagenum+1, " (length: ", framelength, "bytes) from ", numpackages)
+
+            #if ((cb >= framelength + 7) and (packetBuffer[6 + framelength] == 0x36)): #header end (packet stop)
+            if (packetBuffer[TPM2_NET_HEADERSIZE + framelength] == 0x36): #header end (packet stop)
                 i = 0
-                packetindex = 6
+                packetindex = TPM2_NET_HEADERSIZE
                 
-                col=0
-                row = 0
+                if(packagenum == 0):
+                    led_index = 0
+                    #print("RGB: ", hex(packetBuffer[packetindex])[2:], hex(packetBuffer[packetindex+1])[2:], hex(packetBuffer[packetindex+2])[2:])
           
-                while(packetindex < (framelength + 6)): 
-                    r =packetBuffer[packetindex]
-                    g =packetBuffer[packetindex+1]
-                    b =packetBuffer[packetindex+2]
-                    rgbArray[row][col][0] = r
-                    rgbArray[row][col][1] = r
-                    rgbArray[row][col][2] = r
-                 
-                    
-                    col +=1
+                #while(packetindex < (framelength + 6)):
+                # framelength in glediator always equal max channels not matrix size
+                while(packetindex < (framelength + TPM2_NET_HEADERSIZE)): # and packetindex < (NUMPIXELS*3 + TPM2_NET_HEADERSIZE)):
+                    try:
+                        r = packetBuffer[packetindex]
+                        g = packetBuffer[packetindex+1]
+                        b = packetBuffer[packetindex+2]
+                    except:
+                        print("NO")
+                    pixels[led_index][0] = r
+                    pixels[led_index][1] = g
+                    pixels[led_index][2] = b
+                    #print("RGB: ", hex(r)[2:], hex(g)[2:], hex(b)[2:])
+                    led_index +=1        
                     packetindex +=3
-                    if (col == COLUMN_COUNT):
-                        col = 0
-                        row +=1
-                    
-          
-        if((packagenum == numpackages) and (led_index== NUMPIXELS)): 
-            pixels.show()
+        #draw_board() #draw every packet
+        #if((packagenum+1) == numpackages): # and (led_index == NUMPIXELS)):
+        #print (led_index, NUMPIXELS)            
+        if (led_index >= NUMPIXELS):
+            draw_board()
+            #print ('.')
+            #pixels = np.zeros((NUMPIXELS, 3), 'uint8') #unkommentiert schneller?
             led_index = 0
      
- 
-def create_board():
-    board = np.zeros((ROW_COUNT,COLUMN_COUNT))
-    rgbArray = np.zeros((ROW_COUNT,COLUMN_COUNT,3), 'uint8')
-    return board,rgbArray
- 
-def drop_piece(board, row, col, piece):
-    board[row][col] = piece
-    print ('row,col:', row,col)
-    if piece == 1:   #red
-        rgbArray[row][col][0] = 255
-    if piece == 2:   #green
-        rgbArray[row][col][1] = 255
- 
-def is_valid_location(board, col):
-    return board[ROW_COUNT-1][col] == 0
- 
-def get_next_open_row(board, col):
-    for r in range(ROW_COUNT):
-        if board[r][col] == 0:
-            return r
- 
-def print_board(rgbArray):
-    print(np.flip(rgbArray, 0))
- 
-def winning_move(board, piece):
-    return False
- 
-def draw_board(board):
-   
+def draw_board():
+    #for c in range(COLUMN_COUNT):
+        #for r in range(ROW_COUNT):
+        #    pygame.draw.rect(screen, BLUE, (c*SQUARESIZE, r*SQUARESIZE+SQUARESIZE, SQUARESIZE, SQUARESIZE))
+          #  pygame.draw.circle(screen, BLACK, (int(c*SQUARESIZE+SQUARESIZE/2), int(r*SQUARESIZE+SQUARESIZE+SQUARESIZE/2)), RADIUS)
+     
     for c in range(COLUMN_COUNT):
         for row in range(ROW_COUNT):
-            r = rgbArray[row][c][0]
-            g = rgbArray[row][c][1]
-            b = rgbArray[row][c][2]
+            r = pixels[row*COLUMN_COUNT+c][0]
+            g = pixels[row*COLUMN_COUNT+c][1]
+            b = pixels[row*COLUMN_COUNT+c][2]
             color = (r,g,b)
-            pygame.draw.circle(screen, color, (int(c*SQUARESIZE+SQUARESIZE/2), height-int(row*SQUARESIZE+SQUARESIZE/2)), RADIUS)
-           
+            pygame.draw.circle(screen, color, (int(c*SQUARESIZE+SQUARESIZE/2), int(row*SQUARESIZE+SQUARESIZE/2)), RADIUS)
+            #pygame.draw.rect(screen, color, (c*SQUARESIZE, row*SQUARESIZE, c*SQUARESIZE+SQUARESIZE, row+SQUARESIZE+SQUARESIZE)) #slower
+
     pygame.display.update()
  
  
-board,rgbArray = create_board()
-print_board(rgbArray)
-game_over = False
-turn = 0
-
 #initalize pygame
 pygame.init()
-
-#define our screen size
-SQUARESIZE = 30
- 
-#define width and height of board
-width = COLUMN_COUNT * SQUARESIZE
-height = (ROW_COUNT+1) * SQUARESIZE
- 
-size = (width, height)
- 
-RADIUS = int(SQUARESIZE/2 - 5)
- 
+pygame.display.set_caption('Matesim')
 screen = pygame.display.set_mode(size)
-#Calling function draw_board again
+#screen.convert() no difference
 
-rgbArray = readTPM2file()
-print ('rgbArray:')
-print (rgbArray)
-draw_board(board)
+draw_board()
 pygame.display.update()
  
-myfont = pygame.font.SysFont("monospace", 75)
 
-
-rgbArray = readTPM2file()
-
- 
+print("####### Server is listening #######")
 while not game_over:
     # read UDP packets
-    #print("####### Server is listening #######")
+    data, address = s.recvfrom(4096)
     #print ('.')
-    #data, address = s.recvfrom(4096)
+    #print(data)
     #if data:
     #    print (data)
+    #if address:
+    #    print (address)
+    tpm2NetHandle(data, PACKET_SIZE)
 
-    clock.tick(60)
+    clock.tick(100)
  
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             sys.exit()
  
-        if event.type == pygame.MOUSEMOTION:
-            pygame.draw.rect(screen, BLACK, (0,0, width, SQUARESIZE))
-            posx = event.pos[0]
-            if turn == 0:
-                pygame.draw.circle(screen, RED, (posx, int(SQUARESIZE/2)), RADIUS)
-            else: 
-                pygame.draw.circle(screen, YELLOW, (posx, int(SQUARESIZE/2)), RADIUS)
-        pygame.display.update()
         if event.type == pygame.KEYDOWN:
             print ('KEYDOWN')
-            game_over = True
-            
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            pygame.draw.rect(screen, BLACK, (0,0, width, SQUARESIZE))
-            #print(event.pos)
-            # Ask for Player 1 Input
-            if turn == 0:
-                posx = event.pos[0]
-                col = int(math.floor(posx/SQUARESIZE))
- 
-                if is_valid_location(board, col):
-                    row = get_next_open_row(board, col)
-                    drop_piece(board, row, col, 1)
- 
-                    if winning_move(board, 1):
-                        label = myfont.render("Player 1 wins!!", 1, RED)
-                        screen.blit(label, (40,10))
-                        game_over = True
- 
- 
-            # # Ask for Player 2 Input
-            else:               
-                posx = event.pos[0]
-                col = int(math.floor(posx/SQUARESIZE))
- 
-                if is_valid_location(board, col):
-                    row = get_next_open_row(board, col)
-                    drop_piece(board, row, col, 2)
- 
-                    if winning_move(board, 2):
-                        label = myfont.render("Player 2 wins!!", 1, YELLOW)
-                        screen.blit(label, (40,10))
-                        game_over = True
- 
-            print_board(board)
-            draw_board(board)
- 
-            turn += 1
-            turn = turn % 2
+            game_over = 1
  
 
 # pygame.time.wait(3000)

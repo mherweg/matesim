@@ -11,30 +11,22 @@ import math
 # * es kann TPM2 Dateien abspielen
 # TODO: Daten per UDP (tpm2.net) oder seriell (TPM2) empfangen
 #
- 
-BLUE = (0,0,255)
-BLACK = (0,0,0)
-RED = (255,0,0)
-YELLOW = (255,255,0)
- 
+
 ROW_COUNT = 28
 COLUMN_COUNT = 30
 MAXFRAMES = 10000
 FRAMERATE = 25
 filepath = "../content/wirbel.tpm2"
-#filename = "../content/rubik.tpm2"
+filepath = "../content/rubik.tpm2"
 clock = pygame.time.Clock()
 
-
 def readTPM2file():
-    global rgbArray
     file1 = open(filepath, "rb")
- 
-    print("readTPM2file")
+    print("parsing TPM2 file", filepath)
     packetBuffer = file1.read()
     file1.close()
-    print("readTPM2file bytes:", len(packetBuffer) )
-    
+    print("bytes:", len(packetBuffer) )
+    print('please wait')
     i = 0
     frame = 0
     packetindex = 0
@@ -65,11 +57,13 @@ def readTPM2file():
                         col = 0
                         row -=1
             #print('endbyte(soll:54):',packetBuffer[packetindex] )
-            #print('.')
+            #print('=',end="")
             packetindex +=1
             frame +=1
-            print (frame, packetindex)
- 
+            #print (frame, packetindex)
+            print ("=",end="")
+    print()
+    print("frames:", frame)
     return(rgbArray,frame)
     
 
@@ -85,38 +79,29 @@ def draw_board(frame):
             g = rgbArray[frame][row][c][1]
             b = rgbArray[frame][row][c][2]
             color = (r,g,b)
-            pygame.draw.circle(screen, color, (int(c*SQUARESIZE+SQUARESIZE/2), height-int(row*SQUARESIZE+SQUARESIZE/2)), RADIUS)
-           
+            pygame.draw.circle(screen, color, (int(c*SQUARESIZE+SQUARESIZE/2), height-int(row*SQUARESIZE+SQUARESIZE/2)), RADIUS)      
     pygame.display.update()
 
 
- 
 # program start 
 rgbArray = create_board()
-
-
 #initalize pygame
 pygame.init()
-
+pygame.display.set_caption('c3RE MateDisplaySim v.0.3')
 #define our screen size
 SQUARESIZE = 30
- 
 #define width and height of board
 width = COLUMN_COUNT * SQUARESIZE
 height = (ROW_COUNT+1) * SQUARESIZE
- 
 size = (width, height)
- 
 RADIUS = int(SQUARESIZE/2 - 5)
- 
 screen = pygame.display.set_mode(size)
 
 rgbArray,last_frame = readTPM2file()
-#print ('rgbArray:')
+print ('playing', filepath, '... anykey to Quit')
 #print (rgbArray)
 frame=0
 draw_board(frame)
-pygame.display.update()
 game_over = False
 
 while not game_over:
@@ -125,7 +110,7 @@ while not game_over:
         if event.type == pygame.QUIT:
             game_over = True
         if event.type == pygame.KEYDOWN:
-            print ('KEYDOWN')
+            #print ('KEYDOWN')
             game_over = True
         if event.type == pygame.MOUSEBUTTONDOWN:
             pass
